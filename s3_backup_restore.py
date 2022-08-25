@@ -32,7 +32,7 @@ def update_yaml(config_yaml,value):
         updated_f.write(yaml.dump(data,default_flow_style=False))
 
 def main():
-    # Create client with custom HTTP client using proxy server.
+    # Create client with custom values
     client = Minio(
         Constants.MINIO_SVR,
         access_key=Constants.ACCESS_KEY,
@@ -41,7 +41,7 @@ def main():
     )
 
     objects = client.list_objects(Constants.BUCKET_NAME, recursive=True )
-    #sorted object by last_modified time
+    #sort object by last_modified time
     sortedobj  = sorted(objects, key=lambda d: d.last_modified)
 
     #finding the last object name for the latest backup filename
