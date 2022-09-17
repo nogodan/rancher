@@ -21,7 +21,7 @@ class Constants:
   REPO_PASSWD = $LOCAL_REPO_LOGIN_PASSWD
   INPUT_IMAGES_LIST = 'images.txt'
 
-def doc_cmd(action=False):
+def doc_cmd(action):
     file = open(Constants.INPUT_IMAGES_LIST, 'r')
     Lines = file.readlines()
     count = 0
