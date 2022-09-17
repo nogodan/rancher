@@ -10,16 +10,15 @@ rancher/pause:3.2
 # Version 1.0  17 Sept 2022 Taeho.Choi
 #########################################################################
 #!/usr/bin/env python3
-
 import os
 import sys
 
 class Constants:
   LOCAL_REPO = "rancher"
-  LOCAL_REG = $LOCAL_REPO_URL
-  REPO_ID = $LOCAL_REPO_LOGIN_ID
-  REPO_PASSWD = $LOCAL_REPO_LOGIN_PASSWD
+  LOCAL_REG = $PRIVATE_REGISTRY_URL
   INPUT_IMAGES_LIST = 'images.txt'
+  REPO_ID = $PRIVATE_REGISTRY_LOGIN_ID
+  CRED_FILE = $PRIVATE_REGISTRY_LOGIN_PASSWD_FILE_PATH
 
 def doc_cmd(action):
     file = open(Constants.INPUT_IMAGES_LIST, 'r')
@@ -38,7 +37,8 @@ def doc_cmd(action):
             print("Hmm something wrong with the docker verb")
 
 def doc_login():
-    return os.system('docker login '+ Constants.LOCAL_REG + Constants.LOCAL_REPO +' -u '+ Constants.REPO_ID + ' -p '+ Constants.REPO_PASSWD)
+    _pass = open(Constants.CRED_FILE,'r').readlines()
+    return os.system('docker login '+ Constants.LOCAL_REG + Constants.LOCAL_REPO +' -u '+ Constants.REPO_ID + ' -p '+ _pass[0])
 
 def main():
     #pulling docker images to local dir
