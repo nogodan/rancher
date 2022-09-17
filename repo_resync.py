@@ -38,7 +38,7 @@ def doc_cmd(action):
             print("Hmm something wrong with the docker verb")
 
 def doc_login():
-    return os.system('docker login '+ Constants.REG + Constants.LOCAL_REPO +' -u '+ Constants.REPO_ID + ' -p '+ Constants.REPO_PASSWD)
+    return os.system('docker login '+ Constants.LOCAL_REG + Constants.LOCAL_REPO +' -u '+ Constants.REPO_ID + ' -p '+ Constants.REPO_PASSWD)
 
 def main():
     #pulling docker images to local dir
