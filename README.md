@@ -21,7 +21,7 @@ Each script runs in under a minute (except `etcd check perf` which takes ~30s), 
 
 All scripts must be run as **root** (`sudo`). They are safe to run on live production nodes — they are read-only and make no changes to the system.
 
-### 🖥️ controller_triage.sh — RKE2 Controller Node
+### controller_triage.sh — RKE2 Controller Node
 
 Run directly on the **controller / management node**:
 
@@ -62,7 +62,7 @@ etcdctl check perf                           (~30s)
 
 ---
 
-### 👷 worker_triage.sh — RKE2 Worker Node
+### worker_triage.sh — RKE2 Worker Node
 
 Requires the **controller IP** as an argument:
 
@@ -97,7 +97,7 @@ sudo ./worker_triage.sh 10.0.0.10
 
 ---
 
-### 💾 longhorn_triage.sh — Longhorn Storage Node
+### longhorn_triage.sh — Longhorn Storage Node
 
 Run on any node in a Longhorn cluster:
 
@@ -138,7 +138,7 @@ sudo ./longhorn_triage.sh
 
 ---
 
-### 🌾 harvester_triage.sh — Harvester HCI Node
+### harvester_triage.sh — Harvester HCI Node
 
 Run on any Harvester node (auto-detects management vs compute role):
 
