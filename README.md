@@ -1,4 +1,4 @@
-# 🩺 SUSE / RKE2 / Harvester / Longhorn Triage Scripts
+# SUSE / RKE2 / Harvester / Longhorn Triage Scripts
 
 A collection of emergency triage shell scripts for quickly diagnosing common issues on **SUSE / RKE2-based Kubernetes** infrastructure. Designed for support engineers and platform teams who need fast root-cause visibility when a customer opens a critical case.
 
