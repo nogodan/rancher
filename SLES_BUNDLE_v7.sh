@@ -261,10 +261,10 @@ if [ -s "$UNIFIED_SAR_TEXT" ]; then
 
 fi
 
-if [ -n "$ALL_SAR_FILES" ]; then
-    log "\nProcessed Performance Metric Source Files:"
-    echo "$ALL_SAR_FILES" | while read -r f; do [ -f "$f" ] && log "  - $(basename "$f")"; done
-fi
+#if [ -n "$ALL_SAR_FILES" ]; then
+#    log "\nProcessed Performance Metric Source Files:"
+#    echo "$ALL_SAR_FILES" | while read -r f; do [ -f "$f" ] && log "  - $(basename "$f")"; done
+#fi
 
 if [ "$SAR_ANY_DATA" -eq 0 ]; then
     log "No parsed sar metric profiles found (use 'supportconfig -p' to capture data)"
