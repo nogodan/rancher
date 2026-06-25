@@ -68,22 +68,20 @@ findfile() {
 }
 
 # Variable evaluations after findfile & SCDIR are safely established
-MESSAGES=$(findfile messages.txt boot.txt var-log-messages.txt syslog.txt 2>/dev/null)
-BOOT=$(findfile boot.txt 2>/dev/null)
-BASICENV=$(findfile basic-environment.txt 2>/dev/null)
-KERNEL=$(findfile kernel.txt 2>/dev/null)
-MEMINFO=$(findfile memory.txt mem.txt 2>/dev/null)
-KDUMP=$(findfile kdump.txt 2>/dev/null)
-CRASHF=$(findfile crash.txt 2>/dev/null)
-IPMI=$(findfile ipmitool-sel.txt ipmi.txt 2>/dev/null)
-RPM=$(findfile rpm.txt 2>/dev/null)
-HW=$(findfile hardware.txt 2>/dev/null)
-FS=$(findfile fs-diskio.txt partitions.txt 2>/dev/null)
-PARTITIONS=$(findfile fs-diskio.txt partitions.txt 2>/dev/null)
-MODPROBE=$(findfile modprobe.txt udev.txt 2>/dev/null)
-NETSTAT=$(findfile network.txt 2>/dev/null)
-SAR_TEXT=$(findfile sar.txt 2>/dev/null)
-SAR_BIN_FILES=$(find "$SCDIR" -type f \( -iname "sa[0-9]*" -o -path "*sar*sa[0-9]*" \) 2>/dev/null)
+MESSAGES=$(findfile messages.txt boot.txt var-log-messages.txt syslog.txt 2>/dev/null || echo "")
+BOOT=$(findfile boot.txt 2>/dev/null || echo "")
+BASICENV=$(findfile basic-environment.txt 2>/dev/null || echo "")
+KERNEL=$(findfile kernel.txt 2>/dev/null || echo "")
+MEMINFO=$(findfile memory.txt mem.txt 2>/dev/null || echo "")
+KDUMP=$(findfile kdump.txt 2>/dev/null || echo "")
+CRASHF=$(findfile crash.txt 2>/dev/null || echo "")
+IPMI=$(findfile ipmitool-sel.txt ipmi.txt 2>/dev/null || echo "")
+RPM=$(findfile rpm.txt 2>/dev/null || echo "")
+HW=$(findfile hardware.txt 2>/dev/null || echo "")
+FS=$(findfile fs-diskio.txt partitions.txt 2>/dev/null || echo "")
+PARTITIONS=$(findfile fs-diskio.txt partitions.txt 2>/dev/null || echo "")
+MODPROBE=$(findfile modprobe.txt udev.txt 2>/dev/null || echo "")
+NETSTAT=$(findfile network.txt 2>/dev/null || echo "")
 HAVE_SAR_BIN=0
 command -v sar >/dev/null 2>&1 && HAVE_SAR_BIN=1
 
@@ -97,64 +95,56 @@ fi
 
 section_header "Server Information"
 
-if [ -n "${BASICENV:-}" ]; then
+if [ -n "${BASICENV:-}" ] && [ -f "$BASICENV" ]; then
     grep -E "^Linux " "$BASICENV" 2>/dev/null | head -1 | while read -r line; do
         log "Hostname/Kernel : $line"
     done
 fi
 
-if [ -n "${RPM:-}" ]; then
-    KVER=$(grep -m1 -E "^kernel-default|^kernel-azure" "$RPM" 2>/dev/null)
+if [ -n "${RPM:-}" ] && [ -f "$RPM" ]; then
+    KVER=$(grep -m1 -E "^kernel-default|^kernel-azure" "$RPM" 2>/dev/null || echo "")
     [ -n "$KVER" ] && log "Kernel Version  : $KVER"
 
-    PRODUCT=$(grep -m1 "SUSE Linux Enterprise\|openSUSE" "$RPM" 2>/dev/null)
+    PRODUCT=$(grep -m1 "SUSE Linux Enterprise\|openSUSE" "$RPM" 2>/dev/null || echo "")
     [ -n "$PRODUCT" ] && log "Product         : $PRODUCT"
 
-    SPACK=$(grep -m1 "SP[0-9]" "$RPM" 2>/dev/null)
+    SPACK=$(grep -m1 "SP[0-9]" "$RPM" 2>/dev/null || echo "")
     [ -n "$SPACK" ] && log "Service Pack    : $SPACK"
 fi
 
-if [ -n "${HW:-}" ]; then
-    HYPERVISOR=$(grep -im1 "^[[:space:]]*Manufacturer:" "$HW" 2>/dev/null)
+if [ -n "${HW:-}" ] && [ -f "$HW" ]; then
+    HYPERVISOR=$(grep -im1 "^[[:space:]]*Manufacturer:" "$HW" 2>/dev/null || echo "")
     [ -n "$HYPERVISOR" ] && log "$HYPERVISOR"
 fi
 
-if [ -n "${BASICENV:-}" ]; then
-    UPTIME=$(grep -i "uptime" "$BASICENV" 2>/dev/null | head -1)
+if [ -n "${BASICENV:-}" ] && [ -f "$BASICENV" ]; then
+    UPTIME=$(grep -i "uptime" "$BASICENV" 2>/dev/null | head -1 || echo "")
     [ -n "$UPTIME" ] && log "System Uptime   : $UPTIME"
 fi
 
 section_header "Last 3 Reboot Dates and Times"
 
-REBOOT_TIMES=()
-if [ -n "${BOOT:-}" ]; then
-    while IFS= read -r line; do
-        if [[ $line =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2} ]]; then
-            TIMESTAMP="${line:0:19}"
-            if [ ${#REBOOT_TIMES[@]} -eq 0 ] || [ "$TIMESTAMP" != "${REBOOT_TIMES[-1]}" ]; then
-                REBOOT_TIMES+=("$TIMESTAMP")
-            fi
-        fi
-    done < "$BOOT"
-fi
-
-if [ ${#REBOOT_TIMES[@]} -gt 0 ]; then
+HAVE_REBOOTS=0
+if [ -n "${BOOT:-}" ] && [ -f "$BOOT" ]; then
     COUNT=0
-    for time in "${REBOOT_TIMES[@]}"; do
+    while IFS= read -r time; do
+        [ -z "$time" ] && continue
         COUNT=$((COUNT + 1))
         log "  $COUNT. $time"
-        [ $COUNT -ge 3 ] && break
-    done
-else
+        HAVE_REBOOTS=1
+    done < <(grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' "$BOOT" 2>/dev/null | uniq | head -n 3)
+fi
+
+if [ "$HAVE_REBOOTS" -eq 0 ]; then
     log "(No reboot timestamps found in logs)"
 fi
 
 section_header "Platform and Virtualization"
 
 VIRT_TYPE="unknown"
-if [ -n "${HW:-}" ]; then
-    RAW_MANUF=$(grep -im1 "^[[:space:]]*Manufacturer:" "$HW" 2>/dev/null)
-    RAW_PROD=$(grep -im1 "^[[:space:]]*Product Name:" "$HW" 2>/dev/null)
+if [ -n "${HW:-}" ] && [ -f "$HW" ]; then
+    RAW_MANUF=$(grep -im1 "^[[:space:]]*Manufacturer:" "$HW" 2>/dev/null || echo "")
+    RAW_PROD=$(grep -im1 "^[[:space:]]*Product Name:" "$HW" 2>/dev/null || echo "")
 
     VAL_MANUF=$(echo "$RAW_MANUF" | cut -d':' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
     VAL_PROD=$(echo "$RAW_PROD" | cut -d':' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
@@ -172,7 +162,7 @@ if [ -n "${HW:-}" ]; then
         *"Google"*)                  VIRT_TYPE="Google Compute Engine (GCP)" ;;
         *"Amazon EC2"*)              VIRT_TYPE="Amazon EC2 (AWS)" ;;
         *Bochs*)                     VIRT_TYPE="Bochs/QEMU emulation" ;;
-        " ") VIRT_TYPE="Unknown (no strings found)" ;;
+        " ")                         VIRT_TYPE="Unknown (no strings found)" ;;
         *)                           VIRT_TYPE="Bare Metal" ;;
     esac
 fi
@@ -188,14 +178,14 @@ fi
 
 log "\n[2] CPU / Memory / Disk Inventory"
 
-if [ -n "${HW:-}" ]; then
+if [ -n "${HW:-}" ] && [ -f "$HW" ]; then
     log "  CPU:"
     grep -im1 -E "^[[:space:]]*Model name:" "$HW" 2>/dev/null | while read -r line; do log "    $line"; done
     grep -im1 -E "^CPU\(s\):" "$HW" 2>/dev/null | while read -r line; do log "    $line"; done
     grep -im1 -E "^Thread\(s\) per core:|^Core\(s\) per socket:|^Socket\(s\):" "$HW" 2>/dev/null | while read -r line; do log "    $line"; done
 fi
 
-if [ -n "${MEMINFO:-}" ]; then
+if [ -n "${MEMINFO:-}" ] && [ -f "$MEMINFO" ]; then
     log "  Memory:"
     awk -F: '
     /^[Mm]emTotal/  { printf "    MemTotal:       %.2f GB\n", $2/1024/1024 }
@@ -203,67 +193,86 @@ if [ -n "${MEMINFO:-}" ]; then
     ' "$MEMINFO" 2>/dev/null
 fi
 
-if [ -n "${PARTITIONS:-}" ]; then
+if [ -n "${PARTITIONS:-}" ] && [ -f "$PARTITIONS" ]; then
     log "  Disk layout:"
     grep -iE "^Disk /dev|^NAME|disk[[:space:]]|^/dev/" "$PARTITIONS" 2>/dev/null | head -15 | while read -r line; do log "    $line"; done
-elif [ -n "${HW:-}" ]; then
+elif [ -n "${HW:-}" ] && [ -f "$HW" ]; then
     grep -iE "^Disk /dev" "$HW" 2>/dev/null | head -10 | while read -r line; do log "    $line"; done
 fi
 
+# ---------------------------------------------------------------------------
+# Section 3: Performance Metrics (sar) - Optimized Data Streaming
+# ---------------------------------------------------------------------------
+
 section_header "Performance Metrics (sar)"
 
-SAR_ANY_DATA=0
+UNIFIED_SAR_TEXT="$WORKDIR/unified_sar_metrics.txt"
+touch "$UNIFIED_SAR_TEXT"
 
-if [ -n "${SAR_TEXT:-}" ]; then
-    SAR_ANY_DATA=1
-    log "Source: sar.txt (system activity reporter dump)"
+# Searches recursively underneath the entire extracted bundle structure
+ALL_SAR_FILES=$(find "$SCDIR" -type f \( -name "sar*" -o -name "sa[0-9]*" \) 2>/dev/null || echo "")
 
-    extract_block() {
-        awk -v pat="$1" '$0 ~ pat { grab=1 } grab && NF==0 { grab=0 } grab { print }' "$2"
-    }
-
-    CPU_BLOCK=$(extract_block "%iowait" "$SAR_TEXT")
-    if [ -n "$CPU_BLOCK" ]; then
-        CPU_FLAGS=$(echo "$CPU_BLOCK" | grep -viE "%iowait|Average" | awk '$3=="all" { iowait=$7+0; idle=$9+0; if (idle < 10) print "[HIGH] CPU near-saturation (%idle="idle"%)"; else if (iowait > 30) print "[HIGH] High I/O wait (%iowait="iowait"%)" }')
-        [ -n "$CPU_FLAGS" ] && { log "CPU Bottlenecks:"; echo "$CPU_FLAGS" | while read -r line; do log "$line"; done; } || log "CPU: OK"
-    fi
-
-    MEM_BLOCK=$(extract_block "%memused" "$SAR_TEXT")
-    if [ -n "$MEM_BLOCK" ]; then
-        MEM_FLAGS=$(echo "$MEM_BLOCK" | grep -viE "%memused|Average" | awk '{memused=$5+0; if (memused > 90) print "[HIGH] High memory (%memused="memused"%)" }')
-        [ -n "$MEM_FLAGS" ] && { log "Memory Pressure:"; echo "$MEM_FLAGS" | while read -r line; do log "$line"; done; } || log "Memory: OK"
-    fi
-
-    DISK_BLOCK=$(extract_block "%util" "$SAR_TEXT")
-    if [ -n "$DISK_BLOCK" ]; then
-        DISK_FLAGS=$(echo "$DISK_BLOCK" | grep -viE "%util|Average" | awk '{await=$9+0; util=$NF+0; if (await > 50) print "[HIGH] High disk await ("await"ms)"; else if (util > 90) print "[HIGH] Disk saturation (%util="util"%)" }')
-        [ -n "$DISK_FLAGS" ] && { log "Disk I/O:"; echo "$DISK_FLAGS" | while read -r line; do log "$line"; done; } || log "Disk I/O: OK"
-    fi
+if [ -n "$ALL_SAR_FILES" ]; then
+    while read -r f; do
+        [ -z "$f" ] && continue
+        
+        # Determine specific decompression profile
+        DECOMPRESS_CMD="cat"
+        if [[ "$f" == *.xz ]]; then
+            DECOMPRESS_CMD="xzcat"
+        elif [[ "$f" == *.gz ]]; then
+            DECOMPRESS_CMD="zcat"
+        elif [[ "$f" == *.bz2 ]]; then
+            DECOMPRESS_CMD="bzcat"
+        fi
+        
+        # Output uncompressed stream to temporary verification profile
+        $DECOMPRESS_CMD "$f" > "$WORKDIR/current_sar_check" 2>/dev/null || continue
+        [ ! -s "$WORKDIR/current_sar_check" ] && continue
+        
+        # Process dynamically depending on binary format vs text logs
+        if [ "$HAVE_SAR_BIN" -eq 1 ] && sar -f "$WORKDIR/current_sar_check" >/dev/null 2>&1; then
+            # OPTIMIZATION: Extract ONLY Overall CPU, Memory, and Disk to avoid core-dump bloat on large nodes
+            sar -u -r -d -f "$WORKDIR/current_sar_check" >> "$UNIFIED_SAR_TEXT" 2>/dev/null
+        else
+            # Ensure it is standard ASCII text data (prevents corrupted binary logs)
+            if grep -qI '.' "$WORKDIR/current_sar_check" 2>/dev/null; then
+                cat "$WORKDIR/current_sar_check" >> "$UNIFIED_SAR_TEXT"
+            fi
+        fi
+    done <<< "$ALL_SAR_FILES"
 fi
 
-if [ -n "${SAR_BIN_FILES:-}" ]; then
+SAR_ANY_DATA=0
+if [ -s "$UNIFIED_SAR_TEXT" ]; then
     SAR_ANY_DATA=1
-    log "Raw sar accounting files found (sa<DD>):"
-    echo "$SAR_BIN_FILES" | while read -r f; do log "  - $(basename "$f")"; done
+    log "Source: Performance metrics profile aggregation"
 
-    if [ "$HAVE_SAR_BIN" -eq 0 ]; then
-        OS=$(uname -s 2>/dev/null || echo "Unknown")
-        case "$OS" in
-            Darwin)
-                log "macOS detected. To decode these files, install sysstat:"
-                log "  brew install sysstat"
-                log "  sar -A -f <sa_file>"
-                ;;
-            *)
-                log "To decode: install sysstat package and run 'sar -A -f <sa_file>'"
-                ;;
-        esac
-    fi
+    # STREAMING OPTIMIZATION: Pipe large files directly through awk to prevent Bash memory exhaustion
+
+    CPU_FLAGS=$(awk '/%iowait/ { grab=1 } grab && NF==0 { grab=0 } grab && $3=="all" { iowait=$7+0; idle=$9+0; if (idle < 10) print "[HIGH] CPU near-saturation (%idle="idle"%)"; else if (iowait > 30) print "[HIGH] High I/O wait (%iowait="iowait"%)" }' "$UNIFIED_SAR_TEXT" | sort -u)
+    [ -n "$CPU_FLAGS" ] && { log "CPU Bottlenecks:"; echo "$CPU_FLAGS" | while read -r line; do log "  $line"; done; } || log "CPU: OK"
+
+    MEM_FLAGS=$(awk '/%memused/ { grab=1 } grab && NF==0 { grab=0 } grab && !/%memused|Average/ && NF>=5 { memused=$5+0; if (memused > 90) print "[HIGH] High memory (%memused="memused"%)" }' "$UNIFIED_SAR_TEXT" | sort -u)
+    [ -n "$MEM_FLAGS" ] && { log "Memory Pressure:"; echo "$MEM_FLAGS" | while read -r line; do log "  $line"; done; } || log "Memory: OK"
+
+    DISK_FLAGS=$(awk '/%util/ { grab=1 } grab && NF==0 { grab=0 } grab && !/%util|Average/ && NF>=9 { await=$9+0; util=$NF+0; if (await > 50) print "[HIGH] High disk await ("await"ms)"; else if (util > 90) print "[HIGH] Disk saturation (%util="util"%)" }' "$UNIFIED_SAR_TEXT" | sort -u)
+    [ -n "$DISK_FLAGS" ] && { log "Disk I/O:"; echo "$DISK_FLAGS" | while read -r line; do log "  $line"; done; } || log "Disk I/O: OK"
+
+fi
+
+if [ -n "$ALL_SAR_FILES" ]; then
+    log "\nProcessed Performance Metric Source Files:"
+    echo "$ALL_SAR_FILES" | while read -r f; do [ -f "$f" ] && log "  - $(basename "$f")"; done
 fi
 
 if [ "$SAR_ANY_DATA" -eq 0 ]; then
-    log "No sar data found (use 'supportconfig -p' to capture performance metrics)"
+    log "No parsed sar metric profiles found (use 'supportconfig -p' to capture data)"
 fi
+
+# ---------------------------------------------------------------------------
+# Section 4+: Signatures and Analysis Profiles
+# ---------------------------------------------------------------------------
 
 section_header "Kernel Panic / Oops / Fault Signatures"
 
@@ -280,7 +289,7 @@ declare -A PATTERNS_FATAL=(
 FOUND_FATAL=0
 for pat in "${!PATTERNS_FATAL[@]}"; do
     if [ -n "$ALL_LOGS" ]; then
-        MATCH=$(grep -inE "$pat" $ALL_LOGS 2>/dev/null | head -2)
+        MATCH=$(grep -inE "$pat" $ALL_LOGS 2>/dev/null | head -2 || echo "")
         if [ -n "$MATCH" ]; then
             FOUND_FATAL=1
             log "[HIGH] $pat"
@@ -298,7 +307,7 @@ declare -A PATTERNS_HW=(
     ["nvme[0-9]+.*resetting controller due to AER"]="NVMe reset due to PCIe AER - hardware-level link/device error"
     ["nvme[0-9]+.*(timeout|I/O error|reset controller)"]="NVMe timeout/reset - check firmware, link, and PCIe health"
     ["EXT4-fs.*aborted journal"]="ext4 journal abort - usually downstream of storage controller error"
-    ["mpt3sas.*(fault|error|reset)"]="LSI/Broadcom SAS controller fault"
+    ["mpt3sas.*(fault|error)"]="LSI/Broadcom SAS controller fault"
     ["megaraid_sas.*(fault|error)"]="MegaRAID controller fault"
     ["XFS.*corruption"]="XFS filesystem corruption"
     ["ata[0-9]+.*(exception|hard resetting)"]="SATA/AHCI link reset - disk/cabling issue"
@@ -311,7 +320,7 @@ declare -A PATTERNS_HW=(
 FOUND_HW=0
 for pat in "${!PATTERNS_HW[@]}"; do
     if [ -n "$ALL_LOGS" ]; then
-        MATCH=$(grep -inE "$pat" $ALL_LOGS 2>/dev/null | head -2)
+        MATCH=$(grep -inE "$pat" $ALL_LOGS 2>/dev/null | head -2 || echo "")
         if [ -n "$MATCH" ]; then
             FOUND_HW=1
             log "[CRITICAL] $pat"
@@ -334,7 +343,7 @@ declare -A PATTERNS_LOCKUP=(
 FOUND_LOCK=0
 for pat in "${!PATTERNS_LOCKUP[@]}"; do
     if [ -n "$ALL_LOGS" ]; then
-        MATCH=$(grep -inE "$pat" $ALL_LOGS 2>/dev/null | head -2)
+        MATCH=$(grep -inE "$pat" $ALL_LOGS 2>/dev/null | head -2 || echo "")
         if [ -n "$MATCH" ]; then
             FOUND_LOCK=1
             log "[HIGH] $pat"
@@ -348,7 +357,7 @@ done
 section_header "Out-of-Memory / Memory Pressure"
 
 if [ -n "$ALL_LOGS" ]; then
-    OOM_MATCH=$(grep -inE "Out of memory|oom-kill|oom_reaper" $ALL_LOGS 2>/dev/null | head -5)
+    OOM_MATCH=$(grep -inE "Out of memory|oom-kill|oom_reaper" $ALL_LOGS 2>/dev/null | head -5 || echo "")
     if [ -n "$OOM_MATCH" ]; then
         log "[HIGH] OOM killer activity detected:"
         echo "$OOM_MATCH" | while read -r line; do log "       | ${line#*:}"; done
@@ -359,11 +368,11 @@ fi
 
 section_header "Reboot Gap Analysis"
 
-if [ -n "${MESSAGES:-}" ]; then
+if [ -n "${MESSAGES:-}" ] && [ -f "$MESSAGES" ]; then
     log "Last log lines before suspected reboot:"
     tail -5 "$MESSAGES" 2>/dev/null | while read -r line; do log "$line"; done
 fi
-if [ -n "${BOOT:-}" ]; then
+if [ -n "${BOOT:-}" ] && [ -f "$BOOT" ]; then
     log "First log lines after reboot (boot.txt):"
     head -5 "$BOOT" 2>/dev/null | while read -r line; do log "$line"; done
 fi
@@ -371,8 +380,8 @@ log "Check timestamps: a gap with NO panic string suggests external reset (power
 
 section_header "IPMI / BMC System Event Log (Bare Metal Only)"
 
-if [ -n "${IPMI:-}" ]; then
-    SEL_HITS=$(grep -inE "Power|Watchdog|Critical|Processor|Memory|Temperature|Voltage" "$IPMI" 2>/dev/null | tail -10)
+if [ -n "${IPMI:-}" ] && [ -f "$IPMI" ]; then
+    SEL_HITS=$(grep -inE "Power|Watchdog|Critical|Processor|Memory|Temperature|Voltage" "$IPMI" 2>/dev/null | tail -10 || echo "")
     if [ -n "$SEL_HITS" ]; then
         log "[CRITICAL] SEL events found - correlate timestamps against Reboot Gap:"
         echo "$SEL_HITS" | while read -r line; do log "            | ${line#*:}"; done
@@ -389,7 +398,7 @@ fi
 
 section_header "kdump / Kernel Crash Dump Status"
 
-if [ -n "${KDUMP:-}" ]; then
+if [ -n "${KDUMP:-}" ] && [ -f "$KDUMP" ]; then
     if grep -qiE "enabled|active" "$KDUMP" 2>/dev/null; then
         log "kdump enabled"
         if grep -qiE "vmcore" "$KDUMP" 2>/dev/null; then
@@ -418,7 +427,7 @@ declare -A PATTERNS_KNOWN=(
 FOUND_KNOWN=0
 for pat in "${!PATTERNS_KNOWN[@]}"; do
     if [ -n "$ALL_LOGS" ]; then
-        MATCH=$(grep -inE "$pat" $ALL_LOGS 2>/dev/null | head -2)
+        MATCH=$(grep -inE "$pat" $ALL_LOGS 2>/dev/null | head -2 || echo "")
         if [ -n "$MATCH" ]; then
             FOUND_KNOWN=1
             log "[MED] $pat"
