@@ -199,6 +199,8 @@ if [[ -f "${SYSINFO}/dfh" ]]; then
     USE=$(echo "$line" | awk '{print $5}' | tr -d '%')
     MOUNT=$(echo "$line" | awk '{print $6}')
     [[ -z "$USE" || -z "$MOUNT" ]] && continue
+    # Verify USE is a valid integer to prevent crash under set -u if df reports a Stale file handle error ("handle")
+    [[ ! "$USE" =~ ^[0-9]+$ ]] && continue
     if (( USE >= 90 )); then
       fail "Disk CRITICAL ${USE}% used — ${MOUNT}"
     elif (( USE >= 80 )); then
@@ -215,7 +217,9 @@ if [[ -f "${SYSINFO}/dfi" ]]; then
     [[ "$line" =~ ^Filesystem ]] && continue
     USE=$(echo "$line" | awk '{print $5}' | tr -d '%')
     MOUNT=$(echo "$line" | awk '{print $6}')
-    [[ -z "$USE" || "$USE" == "-" ]] && continue
+    [[ -z "$USE" || "$USE" == "-" || -z "$MOUNT" ]] && continue
+    # Verify USE is a valid integer to prevent crash under set -u if df reports a Stale file handle error ("handle")
+    [[ ! "$USE" =~ ^[0-9]+$ ]] && continue
     if (( USE >= 90 )); then
       fail "inode CRITICAL ${USE}% — ${MOUNT}"
     elif (( USE >= 80 )); then
@@ -733,4 +737,3 @@ echo "              [N/A]      = not applicable to this version/distro"
 echo "              [SKIP]     = required file not present in bundle"
 echo ""
 echo "  Completed at: $(date)"
-echo ""
